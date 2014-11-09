@@ -51,6 +51,18 @@
     <Reference Include="Microsoft.VisualStudio.Shell.Interop.12.0">
       <EmbedInteropTypes>true</EmbedInteropTypes>
     </Reference>
+    <Reference Include="Microsoft.VisualStudio.TestPlatform.ObjectModel">
+      <HintPath>C:\Program Files (x86)\Microsoft Visual Studio 12.0\Common7\IDE\CommonExtensions\Microsoft\TestWindow\Microsoft.VisualStudio.TestPlatform.ObjectModel.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.VisualStudio.TestPlatform.Utilities">
+      <HintPath>C:\Program Files (x86)\Microsoft Visual Studio 12.0\Common7\IDE\CommonExtensions\Microsoft\TestWindow\Microsoft.VisualStudio.TestPlatform.Utilities.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.VisualStudio.TestWindow">
+      <HintPath>C:\Program Files (x86)\Microsoft Visual Studio 12.0\Common7\IDE\CommonExtensions\Microsoft\TestWindow\Microsoft.VisualStudio.TestWindow.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.VisualStudio.TestWindow.Interfaces">
+      <HintPath>C:\Program Files (x86)\Microsoft Visual Studio 12.0\Common7\IDE\CommonExtensions\Microsoft\TestWindow\Microsoft.VisualStudio.TestWindow.Interfaces.dll</HintPath>
+    </Reference>
     <Reference Include="Microsoft.VisualStudio.TextManager.Interop" />
     <Reference Include="Microsoft.VisualStudio.Shell.12.0" />
     <Reference Include="Microsoft.VisualStudio.Shell.Immutable.10.0" />
@@ -128,9 +140,11 @@
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
     <Compile Include="GlobalSuppressions.cs" />
+    <Compile Include="ResultParser.cs" />
+    <Compile Include="TestDiscoverer.cs" />
+    <Compile Include="TestExecutor.cs" />
     <Compile Include="TestRunnerPackage.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Resources.resx">
@@ -151,7 +165,6 @@
   <ItemGroup>
     <None Include="Key.snk" />
   </ItemGroup>
-
   <ItemGroup>
     <Content Include="LICENSE.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>

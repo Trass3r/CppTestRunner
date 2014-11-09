@@ -1,0 +1,228 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+using Microsoft.VisualStudio.TestPlatform.ObjectModel.Adapter;
+using Microsoft.VisualStudio.TestPlatform.ObjectModel;
+using Microsoft.VisualStudio.TestPlatform.ObjectModel.Logging;
+using System.Diagnostics;
+using System.IO;
+
+namespace CppTestRunner
+{
+	struct util
+	{
+		static public
+		string formatCollection<T>(IEnumerable<T> coll)
+		{
+			return "[" + String.Join(", ", coll.Select(o => o.ToString())) + "]";
+		}
+	}
+
+	struct ProcessUtil
+	{
+		static public
+		Process runCommand(string cwd, string cmd, string args)
+		{
+			var si = new ProcessStartInfo(cmd, args)
+			{
+				RedirectStandardOutput = true,
+				RedirectStandardError = true,
+				UseShellExecute = false,
+				CreateNoWindow = true,
+				WorkingDirectory = cwd
+			};
+			Process proc = Process.Start(si);
+			return proc;
+		}
+	}
+
+	/// <summary>
+	/// Runs the tests found inside 1 test container
+	/// 
+	/// is called from a process named vstest.executionengine.x86.exe. This process starts during first discovery pass.
+	/// </summary>
+	[ExtensionUri(ExecutorUriString)]
+	class TestExecutor : ITestExecutor
+	{
+		public const string ExecutorUriString = "executor://TestExecutor/v1";
+		public static readonly Uri ExecutorUri = new Uri(TestExecutor.ExecutorUriString);
+		private bool mCancelled;
+
+		private
+		void runOnce(IFrameworkHandle framework, IRunContext runContext, IEnumerable<TestCase> tests, string exe, bool runAll)
+		{
+			string outputPath = System.IO.Path.GetTempPath();
+			
+			string arguments = "";
+			//if (!runAll)
+				//arguments = "";//GoogleTestCommandLine(runAll, tests, outputPath).GetCommandLine();
+
+			string wd = System.IO.Path.GetTempPath(); //System.IO.Path.GetDirectoryName(exe);
+
+			List<TestResult> results = new List<TestResult>(tests.Count());
+
+			foreach (TestCase test in tests)
+			{
+				framework.RecordStart(test);
+
+				// also create TestResult for startTime
+				var res = new TestResult(test);
+				res.StartTime = DateTime.Now;
+				results.Add(res);
+			}
+
+			if (runContext.IsBeingDebugged)
+			{
+				framework.SendMessage(TestMessageLevel.Informational, "Attaching debugger to " + exe);
+				System.Diagnostics.Process.GetProcessById(framework.LaunchProcessWithDebuggerAttached(exe, wd, arguments, null)).WaitForExit();
+			}
+			else
+			{
+				framework.SendMessage(TestMessageLevel.Informational, String.Format("[{0}] Running {1} {2}", wd, exe, arguments));
+				var proc = ProcessUtil.runCommand(wd, exe, arguments);
+
+				proc.WaitForExit(10 * 1000);
+				int errCode;
+				if (!proc.HasExited)
+				{
+					framework.SendMessage(TestMessageLevel.Warning, String.Format("Had to kill {0} after 300s", exe));
+					proc.Kill();
+					errCode = 42;
+				}
+				else
+					errCode = proc.ExitCode;
+
+				foreach (TestResult res in results)
+				{
+					res.Outcome = errCode != 0 ? TestOutcome.Failed : TestOutcome.Passed;
+					res.Messages.Add(new TestResultMessage(TestResultMessage.StandardOutCategory, proc.StandardOutput.ReadToEnd()));
+					res.Messages.Add(new TestResultMessage(TestResultMessage.StandardErrorCategory, proc.StandardError.ReadToEnd()));
+					// seem unused
+					//res.Messages.Add(new TestResultMessage(TestResultMessage.AdditionalInfoCategory, "passssed"));
+					//res.Messages.Add(new TestResultMessage(TestResultMessage.DebugTraceCategory, "passssed"));
+
+					res.ErrorMessage = "Exit code: " + errCode.ToString();
+					//res.ErrorStackTrace = "bla stack\n\tsss";
+					res.EndTime = DateTime.Now;
+					res.Duration = res.EndTime - res.StartTime;
+
+					framework.RecordResult(res);
+
+					// TODO: looks like outcome passed here is just ignored
+					// maybe only if no TestResult
+//					framework.RecordEnd(res.TestCase, TestOutcome.None);
+				}
+			}
+
+		//	var results = ResultParser.getResults(framework, outputPath, tests);
+
+		//	foreach (TestResult res in results)
+			//	framework.RecordResult(res);
+
+//			foreach (var cas in cases)
+//				framework.RecordEnd(cas, TestOutcome.Passed);
+		}
+
+		private
+		void runTests(IEnumerable<TestCase> tests, IRunContext runContext, IFrameworkHandle framework, bool runAll)
+		{
+			mCancelled = false;
+
+			framework.SendMessage(TestMessageLevel.Informational, String.Format("running tests (all:{2}) in {0} with {1}", Environment.CurrentDirectory, util.formatCollection(tests), runAll));
+//			System.Diagnostics.Debugger.Break();
+
+			// group them by test container
+			foreach (IGrouping<string, TestCase> testGroup in tests.GroupBy(c => c.Source))
+			{
+				if (mCancelled)
+					break;
+
+				string source = testGroup.Key;
+				try
+				{
+					runOnce(framework, runContext, testGroup, source, runAll);
+				}
+				catch (Exception e)
+				{
+					framework.SendMessage(TestMessageLevel.Error, e.Message);
+					framework.SendMessage(TestMessageLevel.Error, e.StackTrace);
+				}
+			}
+		}
+
+		/// <summary>
+		/// cancel the execution of tests
+		/// </summary>
+		void ITestExecutor.Cancel()
+		{
+			//framework.SendMessage(TestMessageLevel.Informational, "Cancelling ");
+			mCancelled = true;
+		}
+
+		/// <summary>
+		/// maps to the "RunAll" functionality.
+		/// receives a collection of strings which correspond to the sources in the test containers.
+		/// list of source file names
+		/// </summary>
+		/// <param name="sources"></param>
+		/// <param name="runContext"></param>
+		/// <param name="frameworkHandle"></param>
+		void ITestExecutor.RunTests(IEnumerable<string> sources, IRunContext runContext, IFrameworkHandle frameworkHandle)
+		{
+			System.Diagnostics.Debugger.Break();
+
+			// just call the discoverer and delegate
+			IEnumerable<TestCase> tests = TestDiscoverer.GetTests(sources, null);
+			//((ITestExecutor)this).RunTests(tests, runContext, frameworkHandle);
+
+			runTests(tests, runContext, frameworkHandle, true);
+
+			/*
+			// TODO:
+			mCancelled = false;
+			foreach (string executable in sources)
+			{
+				if (mCancelled)
+					break;
+
+				//var list = Utils.getTestsFromExecutable(frameworkHandle, executable);
+
+			}
+			*/
+		}
+
+		/// <summary>
+		/// This maps to "RunSelected" test functionality, where a bunch of test cases are passed to the executor.
+		/// </summary>
+		/// <param name="tests"></param>
+		/// <param name="runContext"></param>
+		/// <param name="frameworkHandle"></param>
+		void ITestExecutor.RunTests(IEnumerable<TestCase> tests, IRunContext runContext, IFrameworkHandle frameworkHandle)
+		{
+			runTests(tests, runContext, frameworkHandle, false);
+			// TODO: for now no filtering
+//			var sources = tests.Select(tc => tc.Source).Distinct();
+//			((ITestExecutor)this).RunTests(sources, runContext, frameworkHandle);
+
+/*
+			mCancelled = false;
+
+			foreach (TestCase test in tests)
+			{
+				// TODO: use test.Source
+				if (mCancelled)
+					break;
+
+				// create a TestResult and pass it to the FrameworkHandle (another component of Unit Test Framework)
+				var testResult = new TestResult(test);
+
+				testResult.Outcome = TestOutcome.Passed;// (TestOutcome)test.GetPropertyValue(TestResultProperties.Outcome);
+				frameworkHandle.RecordResult(testResult);
+			}
+ */
+		}
+	}
+}
