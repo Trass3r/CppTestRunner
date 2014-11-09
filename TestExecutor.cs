@@ -84,11 +84,11 @@ namespace CppTestRunner
 				framework.SendMessage(TestMessageLevel.Informational, String.Format("[{0}] Running {1} {2}", wd, exe, arguments));
 				var proc = ProcessUtil.runCommand(wd, exe, arguments);
 
-				proc.WaitForExit(10 * 1000);
+				proc.WaitForExit(400 * 1000);
 				int errCode;
 				if (!proc.HasExited)
 				{
-					framework.SendMessage(TestMessageLevel.Warning, String.Format("Had to kill {0} after 300s", exe));
+					framework.SendMessage(TestMessageLevel.Warning, String.Format("Had to kill {0} after 400s", exe));
 					proc.Kill();
 					errCode = 42;
 				}
@@ -134,8 +134,26 @@ namespace CppTestRunner
 			framework.SendMessage(TestMessageLevel.Informational, String.Format("running tests (all:{2}) in {0} with {1}", Environment.CurrentDirectory, util.formatCollection(tests), runAll));
 //			System.Diagnostics.Debugger.Break();
 
+			Parallel.ForEach(tests.GroupBy(c => c.Source),
+			(testGroup, loopState) =>
+			{
+				if (mCancelled)
+					// no previous iterations need to run so use Stop, not Break
+					loopState.Stop();
+
+				string source = testGroup.Key;
+				try
+				{
+					runOnce(framework, runContext, testGroup, source, runAll);
+				}
+				catch (Exception e)
+				{
+					framework.SendMessage(TestMessageLevel.Error, e.Message);
+					framework.SendMessage(TestMessageLevel.Error, e.StackTrace);
+				}
+			});
 			// group them by test container
-			foreach (IGrouping<string, TestCase> testGroup in tests.GroupBy(c => c.Source))
+/*			foreach (IGrouping<string, TestCase> testGroup in )
 			{
 				if (mCancelled)
 					break;
@@ -151,6 +169,7 @@ namespace CppTestRunner
 					framework.SendMessage(TestMessageLevel.Error, e.StackTrace);
 				}
 			}
+ */
 		}
 
 		/// <summary>
@@ -172,7 +191,7 @@ namespace CppTestRunner
 		/// <param name="frameworkHandle"></param>
 		void ITestExecutor.RunTests(IEnumerable<string> sources, IRunContext runContext, IFrameworkHandle frameworkHandle)
 		{
-			System.Diagnostics.Debugger.Break();
+//			System.Diagnostics.Debugger.Break();
 
 			// just call the discoverer and delegate
 			IEnumerable<TestCase> tests = TestDiscoverer.GetTests(sources, null);
