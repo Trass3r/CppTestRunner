@@ -24,7 +24,7 @@ namespace CppTestRunner
 	struct ProcessUtil
 	{
 		static public
-		Process runCommand(string cwd, string cmd, string args)
+		Process prepCommand(string cwd, string cmd, string args)
 		{
 			var si = new ProcessStartInfo(cmd, args)
 			{
@@ -34,7 +34,8 @@ namespace CppTestRunner
 				CreateNoWindow = true,
 				WorkingDirectory = cwd
 			};
-			Process proc = Process.Start(si);
+			Process proc = new Process();
+			proc.StartInfo = si;
 			return proc;
 		}
 	}
@@ -74,32 +75,71 @@ namespace CppTestRunner
 				results.Add(res);
 			}
 
+			Process proc;
+			const int waitTime = 20 * 60 * 1000; // 20 min
 			if (runContext.IsBeingDebugged)
 			{
 				framework.SendMessage(TestMessageLevel.Informational, "Attaching debugger to " + exe);
-				System.Diagnostics.Process.GetProcessById(framework.LaunchProcessWithDebuggerAttached(exe, wd, arguments, null)).WaitForExit();
+				proc = System.Diagnostics.Process.GetProcessById(framework.LaunchProcessWithDebuggerAttached(exe, wd, arguments, null));
 			}
 			else
 			{
 				framework.SendMessage(TestMessageLevel.Informational, String.Format("[{0}] Running {1} {2}", wd, exe, arguments));
-				var proc = ProcessUtil.runCommand(wd, exe, arguments);
+				proc = ProcessUtil.prepCommand(wd, exe, arguments);
 
-				proc.WaitForExit(400 * 1000);
-				int errCode;
-				if (!proc.HasExited)
+				// now we need to setup async reading of stdout/stderr
+				// so the called process can't block on full buffers
+				StringBuilder output = new StringBuilder();
+				StringBuilder error = new StringBuilder();
+
+				var outputWaitHandle = new System.Threading.AutoResetEvent(false);
+				var errorWaitHandle  = new System.Threading.AutoResetEvent(false);
+
+				proc.OutputDataReceived += (sender, e) =>
 				{
-					framework.SendMessage(TestMessageLevel.Warning, String.Format("Had to kill {0} after 400s", exe));
+					if (e.Data == null)
+					{
+						outputWaitHandle.Set();
+					}
+					else
+					{
+						output.AppendLine(e.Data);
+					}
+				};
+				proc.ErrorDataReceived += (sender, e) =>
+				{
+					if (e.Data == null)
+					{
+						errorWaitHandle.Set();
+					}
+					else
+					{
+						error.AppendLine(e.Data);
+					}
+				};
+				proc.Start();
+				proc.BeginOutputReadLine();
+				proc.BeginErrorReadLine();
+				
+				int errCode;
+				if (proc.WaitForExit(waitTime) && outputWaitHandle.WaitOne(waitTime) && errorWaitHandle.WaitOne(waitTime))
+				{
+					// process completed
+					errCode = proc.ExitCode;
+				}
+				else
+				{
+					// timed out
+					framework.SendMessage(TestMessageLevel.Warning, String.Format("Had to kill {0} after {1}s", exe, waitTime / 1000));
 					proc.Kill();
 					errCode = 42;
 				}
-				else
-					errCode = proc.ExitCode;
 
 				foreach (TestResult res in results)
 				{
 					res.Outcome = errCode != 0 ? TestOutcome.Failed : TestOutcome.Passed;
-					res.Messages.Add(new TestResultMessage(TestResultMessage.StandardOutCategory, proc.StandardOutput.ReadToEnd()));
-					res.Messages.Add(new TestResultMessage(TestResultMessage.StandardErrorCategory, proc.StandardError.ReadToEnd()));
+					res.Messages.Add(new TestResultMessage(TestResultMessage.StandardOutCategory, output.ToString()));
+					res.Messages.Add(new TestResultMessage(TestResultMessage.StandardErrorCategory, error.ToString()));
 					// seem unused
 					//res.Messages.Add(new TestResultMessage(TestResultMessage.AdditionalInfoCategory, "passssed"));
 					//res.Messages.Add(new TestResultMessage(TestResultMessage.DebugTraceCategory, "passssed"));
@@ -134,7 +174,7 @@ namespace CppTestRunner
 			framework.SendMessage(TestMessageLevel.Informational, String.Format("running tests (all:{2}) in {0} with {1}", Environment.CurrentDirectory, util.formatCollection(tests), runAll));
 //			System.Diagnostics.Debugger.Break();
 
-			Parallel.ForEach(tests.GroupBy(c => c.Source),
+			Parallel.ForEach(tests.GroupBy(c => c.Source), new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount },
 			(testGroup, loopState) =>
 			{
 				if (mCancelled)
