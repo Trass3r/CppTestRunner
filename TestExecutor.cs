@@ -171,7 +171,14 @@ namespace CppTestRunner
 		{
 			mCancelled = false;
 
-			framework.SendMessage(TestMessageLevel.Informational, String.Format("running tests (all:{2}) in {0} with {1}", Environment.CurrentDirectory, util.formatCollection(tests), runAll));
+			// TODO: fix
+			if (runContext.IsBeingDebugged)
+			{
+				framework.SendMessage(TestMessageLevel.Error, "Debugging is not supported yet!");
+				return;
+			}
+
+			framework.SendMessage(TestMessageLevel.Informational, String.Format("Running {0} tests...", runAll ? "all" : util.formatCollection(tests)));
 //			System.Diagnostics.Debugger.Break();
 
 			Parallel.ForEach(tests.GroupBy(c => c.Source), new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount },

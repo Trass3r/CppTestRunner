@@ -17,8 +17,8 @@ namespace CppTestRunner
 		bool isTestExecutable (IMessageLogger logger, string e)
 		{
 			const string executablesAllowed = "[qu][Tt]est[s]{0,1}.exe";
-			var matches = Regex.IsMatch(e, executablesAllowed);
-			logger.SendMessage(TestMessageLevel.Informational, String.Format("Does {0} match {1}: {2}", e, executablesAllowed, matches));
+			bool matches = Regex.IsMatch(e, executablesAllowed);
+			logger.SendMessage(TestMessageLevel.Informational, String.Format("Checking {0} for match of {1}: {2}", e, executablesAllowed, matches));
 			return matches;
 		}
 	}
@@ -43,18 +43,10 @@ namespace CppTestRunner
 		/// <returns></returns>
 		void ITestDiscoverer.DiscoverTests(IEnumerable<string> sources, IDiscoveryContext discoveryContext, IMessageLogger logger, ITestCaseDiscoverySink discoverySink)
 		{
-			logger.SendMessage(TestMessageLevel.Informational, String.Format("My DiscoverTests called in {0} with {1}", Environment.CurrentDirectory, sources));
-			//Console.WriteLine("DiscoverTests called in {0} with {1}", Environment.CurrentDirectory, sources);
-//			System.Diagnostics.Debugger.Break();
+			logger.SendMessage(TestMessageLevel.Informational, "Searching for unittest executables...");
+
+			// filter executables
 			var testExecutables = sources.Where(s => Utils.isTestExecutable(logger, s));
-			int i;
-/*			foreach (string exe in testExecutables)
-			{	
-				var googleTestTests = Utils.getTestsFromExecutable(logger, executable);
-				foreach (var test in googleTestTests)
-					discoverySink.SendTestCase(test);
-			}
-*/
 			GetTests(testExecutables, discoverySink);
 		}
 
