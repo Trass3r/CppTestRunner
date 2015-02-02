@@ -9,6 +9,7 @@ using Microsoft.VisualStudio.TestPlatform.ObjectModel;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel.Logging;
 using System.Diagnostics;
 using System.IO;
+using System.Xml.Linq;
 
 namespace CppTestRunner
 {
@@ -48,7 +49,7 @@ namespace CppTestRunner
 	[ExtensionUri(ExecutorUriString)]
 	class TestExecutor : ITestExecutor
 	{
-		public const string ExecutorUriString = "executor://TestExecutor/v1";
+		public const string ExecutorUriString = "executor://CppTestRunnerExecutor/v1";
 		public static readonly Uri ExecutorUri = new Uri(TestExecutor.ExecutorUriString);
 		private bool mCancelled;
 
@@ -135,19 +136,46 @@ namespace CppTestRunner
 					errCode = 42;
 				}
 
+				// now register the results
 				foreach (TestResult res in results)
 				{
 					res.Outcome = errCode != 0 ? TestOutcome.Failed : TestOutcome.Passed;
-					res.Messages.Add(new TestResultMessage(TestResultMessage.StandardOutCategory, output.ToString()));
+					string stdout = output.ToString();
+					res.Messages.Add(new TestResultMessage(TestResultMessage.StandardOutCategory, stdout));
 					res.Messages.Add(new TestResultMessage(TestResultMessage.StandardErrorCategory, error.ToString()));
-					// seem unused
-					//res.Messages.Add(new TestResultMessage(TestResultMessage.AdditionalInfoCategory, "passssed"));
-					//res.Messages.Add(new TestResultMessage(TestResultMessage.DebugTraceCategory, "passssed"));
+					// AdditionalInfoCategory and DebugTraceCategory get ignored
 
-					res.ErrorMessage = "Exit code: " + errCode.ToString();
-					//res.ErrorStackTrace = "bla stack\n\tsss";
+					res.ErrorMessage = "Exit code: " + errCode.ToString() + "\n";
 					res.EndTime = DateTime.Now;
 					res.Duration = res.EndTime - res.StartTime;
+
+					// for now just add failures to message
+					int idx = stdout.IndexOf(@"<?xml");
+					if (idx >= 0)
+					try
+					{
+						string xmlContent = new string(stdout.Skip(idx).ToArray());
+							XElement doc = XElement.Parse(xmlContent); // TODO: LoadOptions.PreserveWhitespace?
+						
+						var failedTests = from failedTest in doc.Descendants("FailedTest")
+						                  select failedTest;
+
+						// TODO: qtest
+						foreach (XElement failedTest in failedTests)
+						{
+							string testName = failedTest.Element("Name").Value;
+							XElement locEl = failedTest.Element("Location");
+							string loc = locEl.Element("File").Value + ":" + locEl.Element("Line").Value;
+							string msg = failedTest.Element("Message").Value;
+							string failureType = failedTest.Element("FailureType").Value;
+
+							res.ErrorMessage += testName + ": " + failureType + "\n" + msg;
+							res.ErrorStackTrace += loc + "\n";
+						}
+					}
+					catch (Exception /*e*/)
+					{
+					}
 
 					framework.RecordResult(res);
 
