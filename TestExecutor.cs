@@ -37,13 +37,17 @@ namespace CppTestRunner
 		private
 		void runOnce(IFrameworkHandle framework, IRunContext runContext, IEnumerable<TestCase> tests, string exe, bool runAll)
 		{
-			string outputPath = System.IO.Path.GetTempPath();
-			
 			string arguments = "";
-			if (!runAll)
+			if (exe.Contains("qtest"))
+				arguments = "-xunitxml";
+			else if (!runAll)
 				arguments = "\"" + String.Join("\" \"", tests.Select(test => test.FullyQualifiedName)) + "\"";//GoogleTestCommandLine(runAll, tests, outputPath).GetCommandLine();
 
-			string wd = System.IO.Path.GetTempPath(); //System.IO.Path.GetDirectoryName(exe);
+			//var userSettingsStore = ExternalSettingsManager.GetWritableSettingsStore(SettingsScope.UserSettings);
+			//System.Diagnostics.Debugger.Break();
+			//var opts = (GeneralOptionsPage)CppTestRunnerPackage.instance.generalOpts;
+			//string wd = opts.workingDir;
+			string wd = System.IO.Path.GetTempPath();
 
 			List<TestResult> results = new List<TestResult>(tests.Count());
 

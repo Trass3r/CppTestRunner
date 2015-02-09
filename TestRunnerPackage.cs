@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.InteropServices;
 using System.ComponentModel.Design;
+using System.ComponentModel;
 using Microsoft.Win32;
 using Microsoft.VisualStudio;
 using Microsoft.VisualStudio.Shell.Interop;
@@ -11,6 +12,26 @@ using Microsoft.VisualStudio.Shell;
 
 namespace CppTestRunner
 {
+/*
+	/// <summary>
+	/// uses DialogPage's default settings grid
+	/// </summary>
+	//[ClassInterface(ClassInterfaceType.AutoDual)]
+	[CLSCompliant(false)]//, ComVisible(true)]
+	public sealed class GeneralOptionsPage : DialogPage
+	{
+		private string _workingDir = System.IO.Path.GetTempPath();
+
+		[Category("Environment")]
+		[DisplayName("Working directory")]
+		[Description("Directory to be used as working directory for running tests")]
+		public string workingDir
+		{
+			get { return _workingDir; }
+			set { _workingDir = value; }
+		}
+	}
+*/
     /// <summary>
     /// This is the class that implements the package exposed by this assembly.
     ///
@@ -24,12 +45,25 @@ namespace CppTestRunner
     // This attribute tells the PkgDef creation utility (CreatePkgDef.exe) that this class is
     // a package.
     [PackageRegistration(UseManagedResourcesOnly = true)]
+	// make sure it is loaded so we can access the options
+//	[ProvideAutoLoad(UIContextGuids80.SolutionExists)]
     // This attribute is used to register the information needed to show this package
     // in the Help/About dialog of Visual Studio.
     [InstalledProductRegistration("#110", "#112", "1.0.2", IconResourceID = 400)]
 	[Guid(GuidList.guidCppTestRunnerPkgString)]
+/*	[ProvideOptionPage(typeof(GeneralOptionsPage),
+	                   "CppTestRunner", // category in Options page
+	                   "General", 0, 0, true)]*/
 	internal sealed class CppTestRunnerPackage : Package
     {
+//		public static CppTestRunnerPackage instance;
+
+/*		public GeneralOptionsPage generalOpts
+		{
+			get { return (GeneralOptionsPage)GetDialogPage(typeof(GeneralOptionsPage)); }
+		}
+*/
+
         /// <summary>
         /// Default constructor of the package.
         /// Inside this method you can place any initialization code that does not require 
