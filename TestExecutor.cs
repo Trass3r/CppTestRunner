@@ -133,13 +133,6 @@ namespace CppTestRunner
 		{
 			mCancelled = false;
 
-			// TODO: fix
-			if (runContext.IsBeingDebugged)
-			{
-				framework.SendMessage(TestMessageLevel.Error, "Debugging is not supported yet!");
-				return;
-			}
-
 			framework.SendMessage(TestMessageLevel.Informational, String.Format("Running {0} tests...", runAll ? "all" : util.formatCollection(tests)));
 			System.Diagnostics.Debugger.Break();
 
