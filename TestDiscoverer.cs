@@ -53,20 +53,27 @@ namespace CppTestRunner
 		public static
 		List<TestCase> GetTests(IEnumerable<string> sources, IMessageLogger logger, ITestCaseDiscoverySink discoverySink)
 		{
+//			System.Diagnostics.Debugger.Break();
 			// create 1 test case for each unittest executable
 			List<TestCase> tests = new List<TestCase>();
 			foreach (string source in sources)
 			{
-				string testName = System.IO.Path.GetFileNameWithoutExtension(source);
-				var testcase = new TestCase(testName, TestExecutor.ExecutorUri, source)
+				string testContainerName = System.IO.Path.GetFileNameWithoutExtension(source);
+				var result = ProcessUtil.runCommand(source, "--list-test-names-only", System.IO.Path.GetTempPath(), logger,
+				(string line) =>
 				{
-					CodeFilePath = source, // what's displayed in testexplorer as source, in this case exe
-				};
+					var testcase = new TestCase(line, TestExecutor.ExecutorUri, source)
+					{
+						DisplayName = line,
+						CodeFilePath = source, // what's displayed in testexplorer as source, in this case exe
+					};
 
-				if (discoverySink != null)
-					discoverySink.SendTestCase(testcase);
-				else
-					tests.Add(testcase);
+					if (discoverySink != null)
+						discoverySink.SendTestCase(testcase);
+					else
+						tests.Add(testcase);
+				}
+				);
 
 /*				var doc = new System.Xml.XmlDocument();
 				doc.LoadXml(@"<?xml version=""1.0""?>
