@@ -22,25 +22,6 @@ namespace CppTestRunner
 		}
 	}
 
-	internal static class ProcessUtil
-	{
-		static public
-		Process prepCommand(string cwd, string cmd, string args)
-		{
-			var si = new ProcessStartInfo(cmd, args)
-			{
-				RedirectStandardOutput = true,
-				RedirectStandardError = true,
-				UseShellExecute = false,
-				CreateNoWindow = true,
-				WorkingDirectory = cwd
-			};
-			Process proc = new Process();
-			proc.StartInfo = si;
-			return proc;
-		}
-	}
-
 	/// <summary>
 	/// Runs the tests found inside 1 test container
 	/// 
@@ -77,72 +58,25 @@ namespace CppTestRunner
 			}
 
 			Process proc;
-			const int waitTime = 20 * 60 * 1000; // 20 min
 			if (runContext.IsBeingDebugged)
 			{
 				framework.SendMessage(TestMessageLevel.Informational, "Attaching debugger to " + exe);
-				proc = System.Diagnostics.Process.GetProcessById(framework.LaunchProcessWithDebuggerAttached(exe, wd, arguments, null));
+				proc = System.Diagnostics.Process.GetProcessById(framework.LaunchProcessWithDebuggerAttached(exe, wd, arguments, /*env=*/null));
 			}
 			else
 			{
 				framework.SendMessage(TestMessageLevel.Informational, String.Format("[{0}] Running {1} {2}", wd, exe, arguments));
-				proc = ProcessUtil.prepCommand(wd, exe, arguments);
 
-				// now we need to setup async reading of stdout/stderr
-				// so the called process can't block on full buffers
-				StringBuilder output = new StringBuilder();
-				StringBuilder error = new StringBuilder();
-
-				var outputWaitHandle = new System.Threading.AutoResetEvent(false);
-				var errorWaitHandle  = new System.Threading.AutoResetEvent(false);
-
-				proc.OutputDataReceived += (sender, e) =>
-				{
-					if (e.Data == null)
-					{
-						outputWaitHandle.Set();
-					}
-					else
-					{
-						output.AppendLine(e.Data);
-					}
-				};
-				proc.ErrorDataReceived += (sender, e) =>
-				{
-					if (e.Data == null)
-					{
-						errorWaitHandle.Set();
-					}
-					else
-					{
-						error.AppendLine(e.Data);
-					}
-				};
-				proc.Start();
-				proc.BeginOutputReadLine();
-				proc.BeginErrorReadLine();
-				
-				int errCode;
-				if (proc.WaitForExit(waitTime) && outputWaitHandle.WaitOne(waitTime) && errorWaitHandle.WaitOne(waitTime))
-				{
-					// process completed
-					errCode = proc.ExitCode;
-				}
-				else
-				{
-					// timed out
-					framework.SendMessage(TestMessageLevel.Warning, String.Format("Had to kill {0} after {1}s", exe, waitTime / 1000));
-					proc.Kill();
-					errCode = 42;
-				}
+				var result = ProcessUtil.runCommand(exe, arguments, wd, framework);
+				int errCode = result.proc.ExitCode;
 
 				// now register the results
 				foreach (TestResult res in results)
 				{
 					res.Outcome = errCode != 0 ? TestOutcome.Failed : TestOutcome.Passed;
-					string stdout = output.ToString();
+					string stdout = result.stdout;
 					res.Messages.Add(new TestResultMessage(TestResultMessage.StandardOutCategory, stdout));
-					res.Messages.Add(new TestResultMessage(TestResultMessage.StandardErrorCategory, error.ToString()));
+					res.Messages.Add(new TestResultMessage(TestResultMessage.StandardErrorCategory, result.stderr));
 					// AdditionalInfoCategory and DebugTraceCategory get ignored
 
 					res.ErrorMessage = "Exit code: " + errCode.ToString() + "\n";
@@ -209,17 +143,17 @@ namespace CppTestRunner
 			framework.SendMessage(TestMessageLevel.Informational, String.Format("Running {0} tests...", runAll ? "all" : util.formatCollection(tests)));
 //			System.Diagnostics.Debugger.Break();
 
+			// run test containers in parallel
 			Parallel.ForEach(tests.GroupBy(c => c.Source), new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount },
 			(testGroup, loopState) =>
 			{
 				if (mCancelled)
-					// no previous iterations need to run so use Stop, not Break
-					loopState.Stop();
+					loopState.Stop(); // don't use Break as we don't need to wait for remaining previous iterations
 
-				string source = testGroup.Key;
+				string testContainer = testGroup.Key;
 				try
 				{
-					runOnce(framework, runContext, testGroup, source, runAll);
+					runOnce(framework, runContext, testGroup, testContainer, runAll);
 				}
 				catch (Exception e)
 				{
@@ -227,24 +161,6 @@ namespace CppTestRunner
 					framework.SendMessage(TestMessageLevel.Error, e.StackTrace);
 				}
 			});
-			// group them by test container
-/*			foreach (IGrouping<string, TestCase> testGroup in )
-			{
-				if (mCancelled)
-					break;
-
-				string source = testGroup.Key;
-				try
-				{
-					runOnce(framework, runContext, testGroup, source, runAll);
-				}
-				catch (Exception e)
-				{
-					framework.SendMessage(TestMessageLevel.Error, e.Message);
-					framework.SendMessage(TestMessageLevel.Error, e.StackTrace);
-				}
-			}
- */
 		}
 
 		/// <summary>
@@ -268,7 +184,7 @@ namespace CppTestRunner
 //			System.Diagnostics.Debugger.Break();
 
 			// just call the discoverer and delegate
-			IEnumerable<TestCase> tests = TestDiscoverer.GetTests(sources, null);
+			IEnumerable<TestCase> tests = TestDiscoverer.GetTests(sources, frameworkHandle, null);
 			//((ITestExecutor)this).RunTests(tests, runContext, frameworkHandle);
 
 			runTests(tests, runContext, frameworkHandle, true);

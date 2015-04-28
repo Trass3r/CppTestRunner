@@ -46,11 +46,12 @@ namespace CppTestRunner
 
 			// filter executables
 			var testExecutables = sources.Where(s => isTestExecutable(logger, s));
-			GetTests(testExecutables, discoverySink);
+			GetTests(testExecutables, logger, discoverySink);
 		}
 
 		// called from "Run all" executor with null sink
-		public static List<TestCase> GetTests(IEnumerable<string> sources, ITestCaseDiscoverySink discoverySink)
+		public static
+		List<TestCase> GetTests(IEnumerable<string> sources, IMessageLogger logger, ITestCaseDiscoverySink discoverySink)
 		{
 			// create 1 test case for each unittest executable
 			List<TestCase> tests = new List<TestCase>();
