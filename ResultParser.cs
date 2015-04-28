@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace CppTestRunner
 {
-	struct ResultParser
+	internal static class ResultParser
 	{
 		static public
 		List<TestResult> getResults(IMessageLogger logger, string outputPath, IEnumerable<TestCase> allCases)

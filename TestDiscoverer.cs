@@ -11,18 +11,6 @@ using System.Text.RegularExpressions;
 
 namespace CppTestRunner
 {
-	struct Utils
-	{
-		public static
-		bool isTestExecutable (IMessageLogger logger, string e)
-		{
-			const string executablesAllowed = "[qu][Tt]est[s]{0,1}.exe";
-			bool matches = Regex.IsMatch(e, executablesAllowed);
-			logger.SendMessage(TestMessageLevel.Informational, String.Format("Checking {0} for match of {1}: {2}", e, executablesAllowed, matches));
-			return matches;
-		}
-	}
-
 	/// <summary>
 	/// finds all tests within a test container
 	/// 
@@ -32,8 +20,19 @@ namespace CppTestRunner
 	/// </summary>
 	[FileExtension(".exe")]
 	[DefaultExecutorUri(TestExecutor.ExecutorUriString)] // Url of the executor that is tied to the discoverer
-	class TestDiscoverer : ITestDiscoverer
+	internal sealed class TestDiscoverer : ITestDiscoverer
 	{
+		private const string executablesAllowed = @"[qu][Tt]est[s]{0,1}.exe";
+		private static Regex testExePattern = new Regex(executablesAllowed, RegexOptions.Compiled);
+
+		public static
+		bool isTestExecutable(IMessageLogger logger, string e)
+		{
+			bool matches = testExePattern.IsMatch(e);
+			logger.SendMessage(TestMessageLevel.Informational, String.Format("Checking {0} for match of {1}: {2}", e, executablesAllowed, matches));
+			return matches;
+		}
+
 		/// <summary>
 		/// </summary>
 		/// <param name="sources">Refers to the list of test sources that are passed to the test adapter from the client [VS or command line]. It would be a list of .xml files in our case.</param>
@@ -46,7 +45,7 @@ namespace CppTestRunner
 			logger.SendMessage(TestMessageLevel.Informational, "Searching for unittest executables...");
 
 			// filter executables
-			var testExecutables = sources.Where(s => Utils.isTestExecutable(logger, s));
+			var testExecutables = sources.Where(s => isTestExecutable(logger, s));
 			GetTests(testExecutables, discoverySink);
 		}
 

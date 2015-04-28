@@ -28,7 +28,7 @@ namespace CppTestRunner
     // in the Help/About dialog of Visual Studio.
     [InstalledProductRegistration("#110", "#112", "1.0", IconResourceID = 400)]
 	[Guid(GuidList.guidCppTestRunnerPkgString)]
-    public sealed class CppTestRunnerPackage : Package
+	internal sealed class CppTestRunnerPackage : Package
     {
         /// <summary>
         /// Default constructor of the package.
@@ -38,10 +38,8 @@ namespace CppTestRunner
         /// initialization is the Initialize method.
         /// </summary>
 		public CppTestRunnerPackage()
-        {
-            Debug.WriteLine(string.Format(CultureInfo.CurrentCulture, "Entering constructor for: {0}", this.ToString()));
-        }
-
+		{
+		}
 
 
         /////////////////////////////////////////////////////////////////////////////
@@ -54,9 +52,7 @@ namespace CppTestRunner
         /// </summary>
         protected override void Initialize()
         {
-            Debug.WriteLine (string.Format(CultureInfo.CurrentCulture, "Entering Initialize() of: {0}", this.ToString()));
             base.Initialize();
-
         }
         #endregion
 

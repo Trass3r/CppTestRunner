@@ -13,7 +13,7 @@ using System.Xml.Linq;
 
 namespace CppTestRunner
 {
-	struct util
+	internal static class util
 	{
 		static public
 		string formatCollection<T>(IEnumerable<T> coll)
@@ -22,7 +22,7 @@ namespace CppTestRunner
 		}
 	}
 
-	struct ProcessUtil
+	internal static class ProcessUtil
 	{
 		static public
 		Process prepCommand(string cwd, string cmd, string args)
@@ -47,7 +47,7 @@ namespace CppTestRunner
 	/// is called from a process named vstest.executionengine.x86.exe. This process starts during first discovery pass.
 	/// </summary>
 	[ExtensionUri(ExecutorUriString)]
-	class TestExecutor : ITestExecutor
+	internal sealed class TestExecutor : ITestExecutor
 	{
 		public const string ExecutorUriString = "executor://CppTestRunnerExecutor/v1";
 		public static readonly Uri ExecutorUri = new Uri(TestExecutor.ExecutorUriString);
@@ -252,7 +252,6 @@ namespace CppTestRunner
 		/// </summary>
 		void ITestExecutor.Cancel()
 		{
-			//framework.SendMessage(TestMessageLevel.Informational, "Cancelling ");
 			mCancelled = true;
 		}
 
