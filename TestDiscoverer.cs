@@ -8,6 +8,7 @@ using Microsoft.VisualStudio.TestPlatform.ObjectModel;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel.Adapter;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel.Logging;
 using System.Text.RegularExpressions;
+using System.Diagnostics;
 
 namespace CppTestRunner
 {
@@ -22,7 +23,7 @@ namespace CppTestRunner
 	[DefaultExecutorUri(TestExecutor.ExecutorUriString)] // Url of the executor that is tied to the discoverer
 	internal sealed class TestDiscoverer : ITestDiscoverer
 	{
-		private const string executablesAllowed = @"[qu][Tt]est[s]{0,1}.exe";
+		private const string executablesAllowed = @"[Tt]est[s]{0,1}.exe";
 		private static Regex testExePattern = new Regex(executablesAllowed, RegexOptions.Compiled);
 
 		public static
@@ -33,13 +34,10 @@ namespace CppTestRunner
 			return matches;
 		}
 
-		/// <summary>
-		/// </summary>
-		/// <param name="sources">Refers to the list of test sources that are passed to the test adapter from the client [VS or command line]. It would be a list of .xml files in our case.</param>
+		/// <param name="sources">list of test containers passed by VS or command line</param>
 		/// <param name="discoveryContext">Refers to the discovery context/runsettings for the current test run. Discoverer shall pull out the tests in a specific way based on the current context.</param>
 		/// <param name="logger">This is used to relay the warning and error messages to the registered loggers. Console Logger and TRXLogger are the built-in loggers that ships with Visual Studio 11. User shall register other custom loggers like FileStreamLogger or DBLogger as required.</param>
 		/// <param name="discoverySink">Discovery sink is used to send back the test cases to the framework as and when they are being discovered. Also it is responsible for the discovery related events.</param>
-		/// <returns></returns>
 		void ITestDiscoverer.DiscoverTests(IEnumerable<string> sources, IDiscoveryContext discoveryContext, IMessageLogger logger, ITestCaseDiscoverySink discoverySink)
 		{
 			logger.SendMessage(TestMessageLevel.Informational, "Searching for unittest executables...");
@@ -58,6 +56,10 @@ namespace CppTestRunner
 			List<TestCase> tests = new List<TestCase>();
 			foreach (string source in sources)
 			{
+				// TODO: make generic
+				if (!CatchCommandLine.isSupportedContainer(source))
+					continue;
+
 				string testContainerName = System.IO.Path.GetFileNameWithoutExtension(source);
 				var result = ProcessUtil.runCommand(source, "--list-test-names-only", System.IO.Path.GetTempPath(), logger,
 				(string line) =>

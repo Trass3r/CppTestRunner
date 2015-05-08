@@ -41,7 +41,7 @@ namespace CppTestRunner
 			
 			string arguments = "";
 			if (!runAll)
-				arguments = "\"" + String.Join("\" \"", tests.Select(test => test.FullyQualifiedName)) + "\"";//GoogleTestCommandLine(runAll, tests, outputPath).GetCommandLine();
+				arguments = "-r junit \"" + String.Join(",", tests.Select(test => test.FullyQualifiedName)) + "\"";//GoogleTestCommandLine(runAll, tests, outputPath).GetCommandLine();
 
 			string wd = System.IO.Path.GetTempPath(); //System.IO.Path.GetDirectoryName(exe);
 
@@ -141,7 +141,6 @@ namespace CppTestRunner
 			}
 
 			framework.SendMessage(TestMessageLevel.Informational, String.Format("Running {0} tests...", runAll ? "all" : util.formatCollection(tests)));
-			System.Diagnostics.Debugger.Break();
 
 			// run test containers in parallel
 			Parallel.ForEach(tests.GroupBy(c => c.Source), new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount },
