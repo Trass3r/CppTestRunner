@@ -70,26 +70,33 @@ namespace CppTestRunner
 				var result = ProcessUtil.runCommand(exe, arguments, wd, framework);
 				int errCode = result.proc.ExitCode;
 
+				var testnewtestresult = new TestResult(tests.First());
+
+				// catch junit report
+				int idx = result.stdout.IndexOf(@"<testsuite");
+				Debug.Assert(idx >= 0);
+				string xmlContent = new string(result.stdout.Skip(idx).ToArray());
+				XElement doc = XElement.Parse(xmlContent);
+
 				// now register the results
 				foreach (TestResult res in results)
 				{
-					res.Outcome = errCode != 0 ? TestOutcome.Failed : TestOutcome.Passed;
-					string stdout = result.stdout;
-					res.Messages.Add(new TestResultMessage(TestResultMessage.StandardOutCategory, stdout));
+					//res.Outcome = errCode != 0 ? TestOutcome.Failed : TestOutcome.Passed;
+					res.Messages.Add(new TestResultMessage(TestResultMessage.StandardOutCategory, result.stdout));
 					res.Messages.Add(new TestResultMessage(TestResultMessage.StandardErrorCategory, result.stderr));
 					// AdditionalInfoCategory and DebugTraceCategory get ignored
 
 					res.ErrorMessage = "Exit code: " + errCode.ToString() + "\n";
-					res.EndTime = DateTime.Now;
-					res.Duration = res.EndTime - res.StartTime;
+//					res.EndTime = DateTime.Now;
+//					res.Duration = res.EndTime - res.StartTime;
 
 					// for now just add failures to message
-					int idx = stdout.IndexOf(@"<?xml");
+/*					int idx = stdout.IndexOf(@"<?xml");
 					if (idx >= 0)
 					try
 					{
 						string xmlContent = new string(stdout.Skip(idx).ToArray());
-							XElement doc = XElement.Parse(xmlContent); // TODO: LoadOptions.PreserveWhitespace?
+						XElement doc = XElement.Parse(xmlContent); // TODO: LoadOptions.PreserveWhitespace?
 						
 						var failedTests = from failedTest in doc.Descendants("FailedTest")
 						                  select failedTest;
@@ -107,8 +114,53 @@ namespace CppTestRunner
 							res.ErrorStackTrace += loc + "\n";
 						}
 					}
-					catch (Exception /*e*/)
+					catch (Exception /*e* /)
 					{
+					}
+*/
+
+					try
+					{
+						res.Outcome = TestOutcome.NotFound;
+						/*
+						var f = from testcase in doc.Descendants("testcase")
+								where testcase.Attribute("name").Value == res.TestCase.FullyQualifiedName
+								select testcase;
+						*/
+						var testcase = doc.Descendants("testcase").First(test => test.Attribute("name").Value == res.TestCase.FullyQualifiedName);
+
+						//foreach (XElement testcase in doc.Descendants("testcase"))
+						{
+							res.Outcome = TestOutcome.Passed;
+							XElement failure;
+							if ((failure = testcase.Element("failure")) != null)
+							{
+								res.Outcome = TestOutcome.Failed;
+								res.ErrorMessage = failure.Attribute("message").Value;
+
+								string msg = failure.FirstNode.ToString().Trim();
+								Debug.Assert(msg.StartsWith("at "));
+								int brIdx = msg.IndexOf('(') + 1;
+								Debug.Assert(brIdx > 3);
+								int line = int.Parse(msg.Substring(brIdx, msg.IndexOf(')', brIdx) - brIdx));
+								res.TestCase.CodeFilePath = msg.Substring(3, brIdx-1 - 3);
+								res.TestCase.LineNumber = line;
+
+//					System.Diagnostics.Debugger.Break();
+
+								// stupid framework is hardcoded to this format
+								res.ErrorStackTrace = "at " + res.TestCase.FullyQualifiedName + " in " + msg.Substring(3, brIdx - 1 - 3) + ":line " + line;
+							}
+//							testcase.Attribute("classname") // global
+							var testcaseName = testcase.Attribute("name").Value;
+							Debug.Assert(res.TestCase.FullyQualifiedName == testcaseName);
+							long duration = (long)(double.Parse(testcase.Attribute("time").Value) * TimeSpan.TicksPerSecond);
+							res.Duration = new TimeSpan(duration);
+						}
+					}
+					catch (Exception e)
+					{
+						framework.SendMessage(TestMessageLevel.Error, e.ToString());
 					}
 
 					framework.RecordResult(res);

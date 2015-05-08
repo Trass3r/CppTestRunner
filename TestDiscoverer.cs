@@ -61,6 +61,7 @@ namespace CppTestRunner
 					continue;
 
 				string testContainerName = System.IO.Path.GetFileNameWithoutExtension(source);
+				/*
 				var result = ProcessUtil.runCommand(source, "--list-test-names-only", System.IO.Path.GetTempPath(), logger,
 				(string line) =>
 				{
@@ -75,7 +76,85 @@ namespace CppTestRunner
 					else
 						tests.Add(testcase);
 				}
+				);*/
+
+				string testname = null;
+				string tags = null;
+				string sourceline = null;
+				var result = ProcessUtil.runCommand(source, "-l", System.IO.Path.GetTempPath(), logger,
+				(string line) =>
+				{
+					//System.Diagnostics.Debugger.Break();
+					if (line.StartsWith("      ["))
+					{
+						tags = line.TrimStart();
+						//currentTestcase.DisplayName += line;
+						return;
+					}
+
+					if (line.StartsWith("      "))
+					{
+						sourceline = line.TrimStart();
+						int idx = sourceline.LastIndexOf(':');
+						Debug.Assert(idx > 0);
+
+						var currentTestcase = new TestCase(testname, TestExecutor.ExecutorUri, source)
+						{
+							CodeFilePath = sourceline.Substring(0, idx), // what's displayed in testexplorer as source, in this case exe
+							LineNumber = int.Parse(sourceline.Substring(idx+1))
+						};
+						
+						currentTestcase.Traits.Add("tags", tags);
+						currentTestcase.Traits.Add("container", source);
+
+						if (discoverySink != null)
+							discoverySink.SendTestCase(currentTestcase);
+						else
+							tests.Add(currentTestcase);
+						return;
+					}
+
+					if (line.StartsWith("  "))
+					{
+						testname = line.TrimStart();
+						return;
+					}
+				}
 				);
+				/*
+				TestCase currentTestcase;
+				string testContainerName = System.IO.Path.GetFileNameWithoutExtension(source);
+				var result = ProcessUtil.runCommand(source, "-l", System.IO.Path.GetTempPath(), logger);
+
+				foreach (var s in result.stdout.GroupBy()
+
+				foreach (result.stdout)
+				(string line) =>
+				{
+					if (line.StartsWith("All"))
+						return;
+
+					if (line.StartsWith("      "))
+					{
+						currentTestcase.Traits.Add("tags", line.Trim());
+						return;
+					}
+
+					if (line.StartsWith("  "))
+					{
+						currentTestcase = new TestCase(line, TestExecutor.ExecutorUri, source)
+						{
+							DisplayName = line,
+							CodeFilePath = source, // what's displayed in testexplorer as source, in this case exe
+						};
+					}
+					if (discoverySink != null)
+						discoverySink.SendTestCase(currentTestcase);
+					else
+						tests.Add(currentTestcase);
+
+				}
+				 * */
 
 /*				var doc = new System.Xml.XmlDocument();
 				doc.LoadXml(@"<?xml version=""1.0""?>
