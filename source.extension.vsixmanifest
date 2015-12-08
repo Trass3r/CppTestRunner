@@ -5,6 +5,7 @@
 		<DisplayName>CppTestRunner</DisplayName>
 		<Description xml:space="preserve">Test adapter for cppunit and QTest unittest executables</Description>
 		<License>LICENSE.txt</License>
+		<MoreInfo>https://github.com/Trass3r/CppTestRunner</MoreInfo>
 	</Metadata>
 	<Installation InstalledByMsi="false">
 		<InstallationTarget Id="Microsoft.VisualStudio.Pro" Version="[12.0,)" />
