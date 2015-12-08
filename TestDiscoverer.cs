@@ -19,7 +19,7 @@ namespace CppTestRunner
 	[DefaultExecutorUri(TestExecutor.ExecutorUriString)] // Url of the executor that is tied to the discoverer
 	internal sealed class TestDiscoverer : ITestDiscoverer
 	{
-		private const string executablesAllowed = @"[qu][Tt]est[s]{0,1}.exe";
+		private const string executablesAllowed = @"([qu]|Unit)[Tt]est[s]{0,1}.exe";
 		private static Regex testExePattern = new Regex(executablesAllowed, RegexOptions.Compiled);
 
 		public static
